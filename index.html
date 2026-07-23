@@ -288,13 +288,15 @@
       }
     });
 
-    apiKeyInput.addEventListener('blur', () => {
-      if (!isKeysLocked && apiKeyInput.value.trim() !== '') {
-         isKeysLocked = true;
-         keyLockOverlay.classList.remove('hidden');
-         apiKeyInput.style.filter = 'blur(6px)';
-         apiKeyInput.classList.add('select-none');
-         apiKeyInput.readOnly = true;
+    document.addEventListener('click', (e) => {
+      if (!isKeysLocked && e.target !== apiKeyInput && !keyLockOverlay.contains(e.target)) {
+         if (apiKeyInput.value.trim() !== '') {
+           isKeysLocked = true;
+           keyLockOverlay.classList.remove('hidden');
+           apiKeyInput.style.filter = 'blur(6px)';
+           apiKeyInput.classList.add('select-none');
+           apiKeyInput.readOnly = true;
+         }
       }
     });
 
