@@ -85,24 +85,24 @@
     </div>
 
     <!-- API Key -->
-    <div class="mb-6">
+    <div class="mb-6 relative">
       <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2" style="font-size: 0.65rem;">PASTE ALL API KEYS HERE (Mix OpenRouter, Groq, & Gemini keys separated by commas or new lines)</label>
-      <textarea id="api-key-input" placeholder="sk-or-v1-...\ngsk_...\nAIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono text-xs h-24 resize-none"></textarea>
+      <div id="key-lock-overlay" class="absolute inset-0 top-[32px] z-10 bg-slate-900/40 backdrop-blur-md cursor-pointer flex items-center justify-center rounded-lg border border-slate-700 hover:bg-slate-800/60 transition-colors">
+         <div class="flex flex-col items-center gap-2">
+            <i data-lucide="lock" class="w-5 h-5 text-emerald-400"></i>
+            <span class="text-xs font-semibold text-emerald-400">Click to Unlock</span>
+         </div>
+      </div>
+      <textarea id="api-key-input" placeholder="sk-or-v1-...\ngsk_...\nAIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono text-xs h-24 resize-none select-none"></textarea>
     </div>
 
-    <!-- Model Select -->
-    <div class="mb-6">
-      <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Select Model</label>
-      <select id="modelSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono text-xs">
-        <option value="gemini-3.6-flash">Gemini 3.6 Flash (Ultra-Efficient)</option>
-        <option value="gemini-3.5-flash" selected>Gemini 3.5 Flash (Recommended)</option>
-        <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Deep Reasoning)</option>
-        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (Fastest)</option>
-        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Fallback)</option>
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
-        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-      </select>
+    <!-- Engine Status -->
+    <div class="mb-6 bg-slate-950 border border-slate-700 rounded-lg p-3">
+      <label class="block text-[0.6rem] font-semibold text-slate-400 uppercase tracking-wider mb-2">AI Engine Status</label>
+      <div class="text-xs font-mono text-emerald-400 mb-2 leading-tight">[ ACTIVE ROTATION ENGINE ]<br/>OpenRouter ➔ Groq ➔ Gemini (Capped)</div>
+      <div id="live-badge" class="text-xs text-slate-300 font-medium bg-slate-800 p-2 rounded border border-slate-700 break-words">
+        Waiting for pipeline...
+      </div>
     </div>
 
     <!-- Upload -->
@@ -135,7 +135,7 @@
       </button>
     </div>
 
-    <div class="mt-auto pt-6 pb-8">
+    <div id="download-container" class="mt-auto pt-6 pb-8 hidden">
       <button id="download-btn" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg">
         <i data-lucide="download" class="w-4 h-4"></i> Export Offline HTML
       </button>
@@ -188,7 +188,7 @@
     let openRouterKeys = [];
     let groqKeys = [];
     let geminiKeys = [];
-    let geminiKeyUsage = {};
+    let keyUsage = {};
 
     function parseApiKeys(keysString) {
       const keys = keysString.split(/[\s,]+/).map(k => k.trim()).filter(k => k.length > 0);
@@ -196,29 +196,41 @@
       groqKeys = keys.filter(k => k.startsWith('gsk_'));
       geminiKeys = keys.filter(k => !k.startsWith('sk-or-v1-') && !k.startsWith('gsk_'));
       
-      geminiKeys.forEach(k => {
-        if (!geminiKeyUsage[k]) geminiKeyUsage[k] = { count: 0, resetTime: Date.now() + 60000 };
+      keys.forEach(k => {
+        if (!keyUsage[k]) keyUsage[k] = { count: 0, resetTime: 0, cooldownUntil: 0 };
       });
     }
 
     async function getAvailableKey() {
-      if (openRouterKeys.length > 0) return { key: openRouterKeys[0], provider: 'openrouter' };
-      if (groqKeys.length > 0) return { key: groqKeys[0], provider: 'groq' };
-      
       const now = Date.now();
+      
+      for (const k of openRouterKeys) {
+        if (now > keyUsage[k].cooldownUntil) return { key: k, provider: 'openrouter' };
+      }
+      for (const k of groqKeys) {
+        if (now > keyUsage[k].cooldownUntil) return { key: k, provider: 'groq' };
+      }
       for (const k of geminiKeys) {
-        let usage = geminiKeyUsage[k];
-        if (now > usage.resetTime) {
-          usage.count = 0;
-          usage.resetTime = now + 60000;
+        let usage = keyUsage[k];
+        if (now > usage.cooldownUntil) {
+          if (now > usage.resetTime) {
+            usage.count = 0;
+            usage.resetTime = now + 60000;
+          }
+          if (usage.count < 10) return { key: k, provider: 'gemini' };
         }
-        if (usage.count < 10) return { key: k, provider: 'gemini' };
       }
       return null;
     }
 
     function recordGeminiUsage(key) {
-      if (geminiKeyUsage[key]) geminiKeyUsage[key].count++;
+      if (keyUsage[key]) keyUsage[key].count++;
+    }
+    
+    function setKeyCooldown(key) {
+      if (keyUsage[key]) {
+        keyUsage[key].cooldownUntil = Date.now() + 60000; // 1 min cooldown
+      }
     }
 
     function rotateKey(provider) {
@@ -235,11 +247,57 @@
     let totalPages = 0;
     const BATCH_SIZE = 50;
     
+    const openRouterModels = ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free', 'qwen/qwen-2.5-72b-instruct:free'];
+    const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    const geminiModels = ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.1-pro'];
+
+    let orModelIdx = 0;
+    let groqModelIdx = 0;
+    let geminiModelIdx = 0;
+
+    function updateLiveBadge(provider, model) {
+      const badge = document.getElementById('live-badge');
+      if (badge) {
+        badge.innerHTML = `Batch ${currentBatch + 1}: Processing via <strong>${provider}</strong> - ${model}`;
+      }
+    }
+    
     let generatedHtmlPages = [];
     let pageFlipInstance = null;
     let pdfDoc = null;
 
     // API Key Handling
+    let isKeysLocked = true;
+    const keyLockOverlay = document.getElementById('key-lock-overlay');
+    apiKeyInput.style.filter = 'blur(6px)';
+    apiKeyInput.readOnly = true;
+
+    keyLockOverlay.addEventListener('click', (e) => {
+      if (isKeysLocked) {
+        const pwd = prompt("Enter password to view/edit keys:");
+        if (pwd === "135792") {
+          isKeysLocked = false;
+          keyLockOverlay.classList.add('hidden');
+          apiKeyInput.style.filter = 'none';
+          apiKeyInput.classList.remove('select-none');
+          apiKeyInput.readOnly = false;
+          apiKeyInput.focus();
+        } else if (pwd !== null) {
+          alert("Incorrect password.");
+        }
+      }
+    });
+
+    apiKeyInput.addEventListener('blur', () => {
+      if (!isKeysLocked && apiKeyInput.value.trim() !== '') {
+         isKeysLocked = true;
+         keyLockOverlay.classList.remove('hidden');
+         apiKeyInput.style.filter = 'blur(6px)';
+         apiKeyInput.classList.add('select-none');
+         apiKeyInput.readOnly = true;
+      }
+    });
+
     apiKeyInput.addEventListener('input', (e) => {
       apiKey = e.target.value.trim();
       localStorage.setItem('gemini_api_key', apiKey);
@@ -388,6 +446,7 @@
         }
 
         currentBatch++;
+        document.getElementById('download-container').classList.remove('hidden');
         downloadBtn.disabled = false; // Allow download of partial results
 
         // Queue next batch
@@ -439,11 +498,13 @@ ${text}`;
         }
         
         try {
-          const selectedModel = document.getElementById('modelSelect').value;
+          let selectedModel = '';
           let response;
           let data;
           
           if (keyInfo.provider === 'openrouter') {
+            selectedModel = openRouterModels[orModelIdx % openRouterModels.length];
+            updateLiveBadge('OpenRouter', selectedModel);
             response = await fetch(`https://openrouter.ai/api/v1/chat/completions`, {
               method: 'POST',
               headers: { 
@@ -451,12 +512,15 @@ ${text}`;
                 'Authorization': `Bearer ${keyInfo.key}`
               },
               body: JSON.stringify({
-                model: `google/${selectedModel}`,
+                model: selectedModel,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.2
               })
             });
+            orModelIdx++;
           } else if (keyInfo.provider === 'groq') {
+            selectedModel = groqModels[groqModelIdx % groqModels.length];
+            updateLiveBadge('Groq', selectedModel);
             response = await fetch(`https://api.groq.com/openai/v1/chat/completions`, {
               method: 'POST',
               headers: { 
@@ -464,12 +528,15 @@ ${text}`;
                 'Authorization': `Bearer ${keyInfo.key}`
               },
               body: JSON.stringify({
-                model: 'llama3-70b-8192',
+                model: selectedModel,
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.2
               })
             });
+            groqModelIdx++;
           } else {
+            selectedModel = geminiModels[geminiModelIdx % geminiModels.length];
+            updateLiveBadge('Gemini', selectedModel);
             recordGeminiUsage(keyInfo.key);
             response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${keyInfo.key}`, {
               method: 'POST',
@@ -479,10 +546,12 @@ ${text}`;
                 generationConfig: { temperature: 0.2 }
               })
             });
+            geminiModelIdx++;
           }
 
           if (response.status === 429) {
             console.warn(`${keyInfo.provider} rate limited. Rotating key.`);
+            setKeyCooldown(keyInfo.key);
             rotateKey(keyInfo.provider);
             retries--;
             continue; // retry
@@ -499,6 +568,7 @@ ${text}`;
           } else {
             rawHtml = data.choices[0].message.content;
           }
+          rotateKey(keyInfo.provider);
           break; // success
           
         } catch (err) {
