@@ -75,25 +75,27 @@
     .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(71, 85, 105, 0.8); border-radius: 10px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex font-sans overflow-hidden">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col lg:flex-row font-sans overflow-y-auto lg:overflow-hidden">
 
   <!-- Sidebar -->
-  <aside class="w-80 bg-slate-900 border-r border-slate-800 flex flex-col p-6 shadow-2xl z-20 overflow-y-auto">
+  <aside class="w-full lg:w-80 shrink-0 bg-slate-900 border-b lg:border-r lg:border-b-0 border-slate-800 flex flex-col p-6 shadow-2xl z-20 overflow-y-visible lg:overflow-y-auto h-auto lg:h-screen">
     <div class="flex items-center gap-3 mb-8">
       <i data-lucide="book-open" class="text-emerald-400 w-8 h-8"></i>
       <h1 class="text-xl font-bold tracking-tight text-white leading-tight">Ebook-ify <br/><span class="text-emerald-400">Reviewer Pro</span></h1>
     </div>
 
     <!-- API Key -->
-    <div class="mb-6 relative">
+    <div class="mb-4">
       <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2" style="font-size: 0.65rem;">PASTE ALL API KEYS HERE (Mix OpenRouter, Groq, & Gemini keys separated by commas or new lines)</label>
-      <div id="key-lock-overlay" class="absolute inset-0 top-[32px] z-10 bg-slate-900/40 backdrop-blur-md cursor-pointer flex items-center justify-center rounded-lg border border-slate-700 hover:bg-slate-800/60 transition-colors">
-         <div class="flex flex-col items-center gap-2">
-            <i data-lucide="lock" class="w-5 h-5 text-emerald-400"></i>
-            <span class="text-xs font-semibold text-emerald-400">Click to Unlock</span>
-         </div>
+      <div class="relative">
+        <div id="key-lock-overlay" class="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-md cursor-pointer flex items-center justify-center rounded-lg border border-slate-700 hover:bg-slate-800/60 transition-colors">
+           <div class="flex items-center gap-2">
+              <i data-lucide="lock" class="w-4 h-4 text-emerald-400"></i>
+              <span class="text-xs font-semibold text-emerald-400">Unlock</span>
+           </div>
+        </div>
+        <textarea id="api-key-input" placeholder="sk-or-v1-...\ngsk_...\nAIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono text-xs h-12 resize-none select-none overflow-y-auto"></textarea>
       </div>
-      <textarea id="api-key-input" placeholder="sk-or-v1-...\ngsk_...\nAIzaSy..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:ring-1 focus:ring-emerald-500 outline-none transition-all font-mono text-xs h-24 resize-none select-none"></textarea>
     </div>
 
     <!-- Engine Status -->
@@ -120,21 +122,6 @@
       <i data-lucide="play" class="w-4 h-4"></i> Start Processing
     </button>
 
-    <!-- Progress -->
-    <div id="progress-container" class="hidden flex-col gap-3 flex-1">
-      <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Batch Pipeline</label>
-      
-      <div class="w-full bg-slate-800 rounded-full h-2.5">
-        <div id="progress-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-      </div>
-      
-      <p id="progress-text" class="text-xs text-slate-300 font-medium">Processing Batch 0 of 0 (Pages 0/0)...</p>
-      
-      <button id="pause-btn" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 mt-2">
-        <i data-lucide="pause" id="pause-icon" class="w-4 h-4"></i> <span id="pause-text">Pause</span>
-      </button>
-    </div>
-
     <div id="download-container" class="mt-auto pt-6 pb-8 hidden">
       <button id="download-btn" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg">
         <i data-lucide="download" class="w-4 h-4"></i> Export Offline HTML
@@ -143,13 +130,53 @@
   </aside>
 
   <!-- Main View -->
-  <main class="flex-1 relative flex items-center justify-center bg-slate-950 p-8 custom-scrollbar">
+  <main class="flex-1 relative flex flex-col items-center justify-center bg-slate-950 p-8 custom-scrollbar min-h-[50vh] lg:min-h-0 overflow-y-auto">
     
     <!-- Empty State -->
-    <div id="empty-state" class="text-center text-slate-500 flex flex-col items-center max-w-md">
-      <i data-lucide="layers" class="w-16 h-16 mb-4 opacity-50"></i>
-      <h2 class="text-xl font-bold text-slate-300 mb-2">No Book Loaded</h2>
-      <p class="text-sm">Upload a PDF and start the batch processor. As Gemini extracts and condenses the data, the 3D flipbook pages will appear here in real-time.</p>
+    <div id="empty-state" class="hidden text-center text-slate-500 flex flex-col items-center max-w-md">
+    </div>
+
+    <!-- Processing Hub (Center Screen) -->
+    <div id="progress-container" class="w-full max-w-2xl flex-col items-center justify-center transition-all duration-500 mb-8 mt-4 lg:mt-0">
+      <div class="w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+        <div class="flex items-center justify-between mb-6">
+           <div>
+             <h3 id="progress-title" class="text-xl font-bold text-white mb-1">System Idle</h3>
+             <p id="progress-subtitle" class="text-slate-400 text-sm">Upload a PDF to begin pipeline</p>
+           </div>
+           <div id="live-badge-status" class="hidden bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/20 animate-pulse">
+             LIVE PROCESSING
+           </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold text-slate-400 uppercase tracking-widest">
+               <span>Pipeline Progress</span>
+               <span id="progress-percent">0%</span>
+            </div>
+            <div class="w-full bg-slate-800 rounded-full h-4 overflow-hidden border border-slate-700">
+              <div id="progress-bar" class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+             <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <i data-lucide="cpu" class="w-6 h-6"></i>
+             </div>
+             <div class="flex-1">
+                <p id="progress-text" class="text-sm text-slate-200 font-medium leading-tight">Waiting for PDF upload...</p>
+                <p class="text-[0.65rem] text-slate-500 uppercase tracking-tighter mt-1">Cognitive Compression Pipeline</p>
+             </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button id="pause-btn" style="display: none;" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 border border-slate-700 shadow-lg active:scale-95">
+              <i data-lucide="pause" id="pause-icon" class="w-4 h-4"></i> <span id="pause-text">Pause Engine</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Flipbook Container -->
@@ -350,6 +377,15 @@
       flipbookContainer.style.display = 'block';
       flipbookContainer.innerHTML = '';
       
+      // Adjust progress container if active
+      if (isProcessing) {
+        const board = progressContainer.querySelector('.max-w-2xl');
+        if (board) board.classList.add('scale-95', 'opacity-90');
+      } else {
+        const board = progressContainer.querySelector('.max-w-2xl');
+        if (board) board.classList.remove('scale-95', 'opacity-90');
+      }
+      
       // Ensure even number of pages for spreads by appending a blank page if needed
       const pagesToRender = [...generatedHtmlPages];
       if (pagesToRender.length > 0 && pagesToRender.length % 2 !== 0) {
@@ -400,9 +436,14 @@
       processBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing...';
       lucide.createIcons();
       
-      progressContainer.classList.remove('hidden');
-      progressContainer.classList.add('flex');
-
+      const board = progressContainer.querySelector('.max-w-2xl');
+      if (board) board.classList.remove('scale-95', 'opacity-90');
+      
+      document.getElementById('progress-title').innerText = 'Ebook Synthesis in Progress';
+      document.getElementById('progress-subtitle').innerText = 'Transforming PDF data into cognitive 3D pages';
+      document.getElementById('live-badge-status').classList.remove('hidden');
+      document.getElementById('pause-btn').style.display = 'flex';
+      
       try {
         const arrayBuffer = await currentFile.arrayBuffer();
         pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -465,10 +506,19 @@
       }
     }
 
+    const progressPercent = document.getElementById('progress-percent');
+    
     function updateProgressUI(startPage, endPage) {
-      const percentage = (currentBatch / totalBatches) * 100;
+      const percentage = Math.round((currentBatch / totalBatches) * 100);
       progressBar.style.width = `${percentage}%`;
+      if (progressPercent) progressPercent.innerText = `${percentage}%`;
       progressText.innerText = `Processing Batch ${currentBatch + 1} of ${totalBatches} (Pages ${startPage}-${endPage}/${totalPages})...`;
+      
+      // If flipbook is already active, we ensure the progress dashboard scales down
+      if (generatedHtmlPages.length > 0) {
+        const board = progressContainer.querySelector('.max-w-2xl');
+        if (board) board.classList.add('scale-95', 'opacity-90');
+      }
     }
 
     async function callGeminiAPI(text) {
@@ -606,9 +656,13 @@ ${text}`;
     function finishProcessing() {
       isProcessing = false;
       progressBar.style.width = '100%';
+      if (progressPercent) progressPercent.innerText = '100%';
       progressText.innerText = 'Processing Complete!';
       pauseBtn.style.display = 'none';
       processBtn.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4"></i> Complete';
+      document.getElementById('progress-title').innerText = 'Synthesis Complete';
+      document.getElementById('progress-subtitle').innerText = 'Book generated successfully';
+      document.getElementById('live-badge-status').classList.add('hidden');
       lucide.createIcons();
     }
 
@@ -616,8 +670,17 @@ ${text}`;
       isProcessing = false;
       processBtn.disabled = false;
       processBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> Start Processing';
-      progressContainer.classList.add('hidden');
-      progressContainer.classList.remove('flex');
+      
+      progressBar.style.width = '0%';
+      if (progressPercent) progressPercent.innerText = '0%';
+      progressText.innerText = 'Waiting for PDF upload...';
+      document.getElementById('progress-title').innerText = 'System Idle';
+      document.getElementById('progress-subtitle').innerText = 'Upload a PDF to begin pipeline';
+      document.getElementById('live-badge-status').classList.add('hidden');
+      pauseBtn.style.display = 'none';
+      
+      const board = progressContainer.querySelector('.max-w-2xl');
+      if (board) board.classList.remove('scale-95', 'opacity-90');
       lucide.createIcons();
     }
 
